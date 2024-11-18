@@ -1,53 +1,47 @@
 import pandas as pd
-import json
+import sys
 
-'''
-T秒ごとにデータフレームをグループ化する関数
+import feature_extract
+import groupbyT
 
-入力 : T(Tに該当する秒数-10,20,30,40,50,60)のいずれか
-
-出力
-
-グループnumber                        time            address rssi
-            0   2024-10-02 17:56:00+09:00  37:7b:5b:02:28:be  -64
-            0   2024-10-02 17:56:00+09:00  ff:0f:00:10:30:60  -79
-            0   2024-10-02 17:56:00+09:00  09:41:52:11:0c:3c  -47
-            0   2024-10-02 17:56:00+09:00  4b:05:b6:cd:37:00  -56
-            0   2024-10-02 17:56:00+09:00  cc:7e:4a:73:96:e8  -89
-            ...            ...                ...  ...
-         7172   2024-10-07 17:28:00+09:00  65:b7:1e:ca:60:13  -79
-         7172   2024-10-07 17:28:00+09:00  fc:06:7a:a3:32:97  -64
-         7172   2024-10-07 17:28:00+09:00  c7:30:1e:7e:44:4a  -58
-         7172   2024-10-07 17:28:00+09:00  40:1c:5a:77:2d:6f  -57
-         7172   2024-10-07 17:28:00+09:00  e3:45:79:4c:0d:fb  -80
-
-'''
-
-
-def make_Tsec_frame(T, file_path):
-    records = []
-    # ファイルを行ごとに読み込む
-    with open(file_path, 'r') as f:
-        for line in f:
-            try:
-                # 各行をJSONとしてパース
-                entry = json.loads(line.strip())
-                time = entry["time"]  # 各スキャン時刻
-                for device in entry["scanned_device"]:
-                    device_record = {"address": device["address"], "rssi": device["rssi"], "time": time}
-                    records.append(device_record)
-            except json.JSONDecodeError:
-                # JSONパースエラーが発生した場合はスキップ
-                print(f"Error parsing line: {line.strip()}")
+def make_df_day(dir_path_data, path_label):
+    # 閾値rssiのリスト 
+    threashold_rssi = [-60, -70, -80, -90, -100]
     
-                
-    df = pd.DataFrame(records)
-    df['time'] = pd.to_datetime(df['time'])
-
-    # 指定された秒数ごとにグループ化
-    df_grouped = df.set_index('time').resample(f'{T+1}S').agg(list).reset_index()
+    # Tでグループ化
+    df_data = groupbyT.make_Tsec_frame(60, dir_path_data, "4.txt", "2.txt")
     
-    df_grouped = df_grouped.explode(['address', 'rssi'])
-    # 必要なカラムだけを選択
-    df_grouped = df_grouped[['time','address', 'rssi']]
-    return df_grouped
+    # 各rssi閾値で特徴量を計算しjoinしていく
+    for i, s in enumerate(threashold_rssi):
+        if i == 0:
+            df_features = feature_extract.extract_features(df_data, s)
+        else:
+            tmp_df = feature_extract.extract_features(df_data, s)
+            
+            # 被るカラムは除去してjoin
+            tmp_df = tmp_df.drop(columns=["time", "unique_address_count", "total_count", "unique_ratio_Tsec"])
+            df_features = df_features.join(tmp_df)
+    
+    # label人数をjoin    
+    df_label = pd.concat([pd.read_csv(path_label + "_lunch.csv"), pd.read_csv(path_label + "_dinner.csv")])
+    df_label = df_label.reset_index(drop=True)
+    df_label = df_label.drop(columns=["time"])
+    df = df_features.join(df_label, how="left")
+    
+    # timeを左に移動
+    df.insert(0, "time", df.pop("time"))
+    
+    return df
+
+
+if __name__ == "__main__":
+    # コマンドライン引数から日付（例: 1028）を取得
+    if len(sys.argv) > 1:
+        date_arg = sys.argv[1]  # 引数1を取得（例: "1028"）
+        DATA_PATH = f"./data/exdata/{date_arg}/"
+        LABEL_PATH = f"./data/make_data/labels/2024{date_arg}"
+        
+        make_df_day(DATA_PATH, LABEL_PATH).to_csv("aaa.csv")
+        
+    else:
+        print("引数を指定してください。")

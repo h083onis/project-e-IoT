@@ -46,7 +46,6 @@ def load_payment_times_from_pdf(pdf_file_paths):
     payment_df = payment_df.groupby('time').size().reset_index(name='action')
     payment_df['action'] = payment_df['action']  # ここでactionが決済数
     # print(payment_df)
-    payment_df.to_csv("./labels/aaa.csv", index=False)
     return payment_df
 
 
@@ -129,7 +128,7 @@ if __name__ == "__main__":
     return_df = load_return_times_from_csv(csv_file_path)
     
     start_time = datetime(year, month, day, 11, 0)
-    end_time = datetime(year, month, day, 14, 0)
+    end_time = datetime(year, month, day, 13, 59)
     
     people_count_df = calculate_people_count(payment_df, return_df, start_time, end_time)
 
@@ -140,7 +139,7 @@ if __name__ == "__main__":
     
     
     start_time = datetime(year, month, day, 17, 0)
-    end_time = datetime(year, month, day, 20, 0)
+    end_time = datetime(year, month, day, 19, 59)
     
     people_count_df = calculate_people_count(payment_df, return_df, start_time, end_time)
 
