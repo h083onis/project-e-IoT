@@ -4,7 +4,7 @@ import sys
 import feature_extract
 import groupbyT
 
-def make_df_day(dir_path_data, path_label):
+def make_df_day(dir_path_data, path_label, train=True):
     # 閾値rssiのリスト 
     threashold_rssi = [-60, -70, -80, -90, -100]
     
@@ -22,11 +22,12 @@ def make_df_day(dir_path_data, path_label):
             tmp_df = tmp_df.drop(columns=["time", "unique_address_count", "total_count", "unique_ratio_Tsec"])
             df_features = df_features.join(tmp_df)
     
-    # label人数をjoin    
-    df_label = pd.concat([pd.read_csv(path_label + "_lunch.csv"), pd.read_csv(path_label + "_dinner.csv")])
-    df_label = df_label.reset_index(drop=True)
-    df_label = df_label.drop(columns=["time"])
-    df = df_features.join(df_label, how="left")
+    if train:
+        # label人数をjoin    
+        df_label = pd.concat([pd.read_csv(path_label + "_lunch.csv"), pd.read_csv(path_label + "_dinner.csv")])
+        df_label = df_label.reset_index(drop=True)
+        df_label = df_label.drop(columns=["time"])
+        df = df_features.join(df_label, how="left")
     
     # timeを左に移動
     df.insert(0, "time", df.pop("time"))
@@ -41,6 +42,7 @@ if __name__ == "__main__":
         DATA_PATH = f"./data/exdata/{date_arg}/"
         LABEL_PATH = f"./data/make_data/labels/2024{date_arg}"
         
+        # 推論時は引数3つめにFalseを入れるとラベル無
         make_df_day(DATA_PATH, LABEL_PATH).to_csv("aaa.csv")
         
     else:
